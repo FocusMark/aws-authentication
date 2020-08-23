@@ -1,0 +1,63 @@
+Description: Clients for use via OAuth2 with the customer pool for authorization.
+
+Parameters:
+  TargetEnvironment:
+    Description: 'Examples can be dev, test or prod'
+    Type: 'String'
+    
+  ProductName:
+    Description: 'Represents the name of the product you want to call the deployment'
+    Type: 'String'
+
+Resources:
+  PostmanClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: True
+      AllowedOAuthScopes:
+        - openid
+        - !Sub 'app.${ProductName}.api.project/project.write'
+        - !Sub 'app.${ProductName}.api.project/project.read'
+        - !Sub 'app.${ProductName}.api.project/project.delete'
+        - !Sub 'app.${ProductName}.api.task/task.write'
+        - !Sub 'app.${ProductName}.api.task/task.read'
+        - !Sub 'app.${ProductName}.api.task/task.delete'
+      CallbackURLs:
+        - !Sub "https://${TargetEnvironment}-auth.${ProductName}.app"
+      ClientName: !Join [ "-", [ !Ref ProductName, !Ref TargetEnvironment, 'userpoolclient', 'postman' ]]
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: True
+      PreventUserExistenceErrors: ENABLED
+      UserPoolId: {'Fn::ImportValue': !Sub '${ProductName}-${TargetEnvironment}-customeruserpoolid'}
+      SupportedIdentityProviders: 
+        - COGNITO
+        
+  CliWindowsClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: True
+      AllowedOAuthScopes:
+        - openid
+        - !Sub 'app.${ProductName}.api.project/project.write'
+        - !Sub 'app.${ProductName}.api.project/project.read'
+        - !Sub 'app.${ProductName}.api.project/project.delete'
+        - !Sub 'app.${ProductName}.api.task/task.write'
+        - !Sub 'app.${ProductName}.api.task/task.read'
+        - !Sub 'app.${ProductName}.api.task/task.delete'
+      CallbackURLs:
+        - !Sub "http://localhost:9000"
+      ClientName: !Join [ "-", [ !Ref ProductName, !Ref TargetEnvironment, 'userpoolclient', 'windowscli' ]]
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      UserPoolId: {'Fn::ImportValue': !Sub '${ProductName}-${TargetEnvironment}-customeruserpoolid'}
+      SupportedIdentityProviders: 
+        - COGNITO

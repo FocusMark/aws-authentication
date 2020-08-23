@@ -1,0 +1,39 @@
+Description: Resource servers that expose permissions for authorizing requests against the API resources
+
+Parameters:
+  TargetEnvironment:
+    Description: 'Examples can be dev, test or prod'
+    Type: 'String'
+    
+  ProductName:
+    Description: 'Represents the name of the product you want to call the deployment'
+    Type: 'String'
+
+Resources:
+  ProjectResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: {'Fn::ImportValue': !Sub '${ProductName}-${TargetEnvironment}-customeruserpoolid'}
+      Identifier: !Sub 'app.${ProductName}.api.project'
+      Name: !Sub '${ProductName}-${TargetEnvironment}-resourceserver-project'
+      Scopes:
+      - ScopeName: project.write
+        ScopeDescription: Create and modify Projects
+      - ScopeName: project.read
+        ScopeDescription: Read existing Projects
+      - ScopeName: project.delete
+        ScopeDescription: Delete Projects
+        
+  TaskResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: {'Fn::ImportValue': !Sub '${ProductName}-${TargetEnvironment}-customeruserpoolid'}
+      Identifier: !Sub 'app.${ProductName}.api.task'
+      Name: !Sub '${ProductName}-${TargetEnvironment}-resourceserver-task'
+      Scopes:
+      - ScopeName: task.write
+        ScopeDescription: Create and modify Tasks
+      - ScopeName: task.read
+        ScopeDescription: Read existing Tasks
+      - ScopeName: task.delete
+        ScopeDescription: Delete existing Projects
