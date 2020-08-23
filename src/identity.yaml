@@ -1,0 +1,57 @@
+Description: Userpool for customer identities and the authentication domain configuration for the hosted auth UI front-end.
+
+Parameters:
+  TargetEnvironment:
+    Description: 'Examples can be dev, test or prod'
+    Type: 'String'
+    
+  ProductName:
+    Description: 'Represents the name of the product you want to call the deployment'
+    Type: 'String'
+
+Resources:
+  CustomerPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AliasAttributes:
+        - preferred_username
+      AutoVerifiedAttributes:
+        - email
+      UserPoolName: !Join [ "-", [ !Ref ProductName, !Ref TargetEnvironment, 'userpool', 'customers' ]]
+      Schema:
+        - AttributeDataType: String
+          Mutable: True
+          Name: email
+          Required: True
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: True
+          RequireUppercase: True
+          TemporaryPasswordValidityDays: 14
+      UsernameConfiguration:
+        CaseSensitive: False
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_LINK
+        
+  AuthDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub '${ProductName}-${TargetEnvironment}'
+      #Domain: !Sub '${TargetEnvironment}-auth.${ProductName}.app'
+      UserPoolId: !Ref CustomerPool
+      #CustomDomainConfig: 
+      #  CertificateArn: {'Fn::ImportValue': !Sub '${ProductName}-${TargetEnvironment}-certificate-auth'}
+      # Commented out until a root A record can be created against the domain.
+        
+Outputs:
+  UserPoolId:
+    Description: 'Id of User Pool for customers'
+    Value: !Ref CustomerPool
+    Export:
+      Name: !Sub '${ProductName}-${TargetEnvironment}-customeruserpoolid'
+  UserPoolArn:
+    Description: 'ARN of the Customer User Pool'
+    Value: !GetAtt CustomerPool.Arn
+    Export:
+      Name: !Sub '${ProductName}-${TargetEnvironment}-customeruserpoolarn'
