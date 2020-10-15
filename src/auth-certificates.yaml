@@ -19,7 +19,7 @@ Resources:
         DomainName: !If [CreateProdResources, !Sub "auth.${ProductName}.app", !Sub "${TargetEnvironment}-auth.${ProductName}.app"]
         DomainValidationOptions:
           - DomainName:  !If [CreateProdResources, !Sub "auth.${ProductName}.app", !Sub "${TargetEnvironment}-auth.${ProductName}.app"]
-            HostedZoneId:  {'Fn::ImportValue': !Sub '${ProductName}-route53-dotappzone'}
+            HostedZoneId:  {'Fn::ImportValue': !Sub '${ProductName}-route53-dotAppZone'}
         ValidationMethod: DNS
         #SubjectAlternativeNames:
         #    - !If [CreateProdResources, !Sub "auth.${ProductName}app.com", !Sub "${TargetEnvironment}-auth.${ProductName}app.com"]

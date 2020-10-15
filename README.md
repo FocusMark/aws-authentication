@@ -1,12 +1,17 @@
-The FocusMark AWS Infrastructure repository contains all of the core AWS infrastructure templates used to deploy the supporting resources that the FocusMark platform depends on.
+# FocusMark Identity and Auth
+
+This repository contains all of the core AWS CloudFormation templates used to deploy the supporting resources that the FocusMark platform depends on for identity and auth.
 
 The repository consists of mostly bash scripts and CloudFormation templates. It has been built and tested in a Linux environment. There should be very little work needed to deploy from macOS; deploying from Windows is not supported at this time but could be done with effort.
+
+> TODO: Discuss adding clients, authorizing APIs in a "hook" in pattern and why usernames over emails, why emails are not in access_tokens and linking data records back to a user via 'sub' and not username or email.
 
 # Deploy
 
 ## Requirements
 
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv1.html)
+- [SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
 
 ## Environment Variables
 In order to run the deployment script you must have your environment set up with a few environment variables. The following table outlines the environment variables required with example values.
@@ -14,31 +19,36 @@ In order to run the deployment script you must have your environment set up with
 | Key                  | Value Type | Description | Examples                                           |
 |----------------------|------------|-------------|----------------------------------------------------|
 | deployed_environment | string     | The name of the environment you are deploying into | dev or prod |
+| focusmark_productname | string | The name of the product. You _must_ use the name of a Domain that you own. | SuperTodo |
 
 In Linux or macOS environments you can set this in your `.bash_profile` file.
 
 ```
-export deployed_environment=prod
+export deployed_environment=dev
+export focusmark_productname=supertodo
+
+PATH=$PATH:$HOME/.local/bin:$HOME/bin
 ```
 
-The `deployed_environment` environment variable will be used in all of the names of the resources provisioned during deployment. Using the prod environment for example, the IAM Role created to grant API Gateway access to CloudWatch will be created as `focusmark-prod-role-apigateway_cloudwatch_integration`.
+once your `.bash_profile` is set you can refresh the environment
 
-### IMPORTANT
-The focusmark platform already uses dev, test and prod. Because of this they are not available as values for the `deployed_environment` environment variable. When the deployment script is executed the CloudFormation will fail due to the API Gateway custom domain already having been taken. It is recommended that you set the value of `deployed_environment` to your name + the environment you want ot deploy into.
+```
+$ source ~/.bash_profile
+```
+
+The `deployed_environment` and `focusmark_productname` environment variables will be used in all of the names of the resources provisioned during deployment. Using the `prod` environment and `supertodo` as the product name for example, the Cognito UserPool created will be called `supertodo-prod-userpool-customers`.
+
 
 ## Infrastructure
 
 The core infrastructure in this repository consists of the following:
 
-- IAM Role granting API Gateway write access to CloudWatch logs
-- Certificate for the API DNS
-- API Gateway Custom Domain bound to the API DNS certificate
+- Certificate for the auth sub-domain
 - Cognito UserPool for user account management and OAuth2/OpenID Connect
 - Default Application Clients that have access to interact with the Cognito Userpool and OAuth/OIDC flows.
+- Resource Servers for the Project and Task APIs.
 
-| Core Deployment | Identity Deployment |
-|-----------------|---------------------|
-| ![Core deployment process](/docs/aws-infrastructure-deployment-Core.png) | ![Identity deployment process](/docs/aws-infrastructure-deployment-Identity.png) |
+![Resources](/docs/identity-infrastructure_resources.jpeg)
 
 ## Deployment
 
@@ -48,12 +58,18 @@ In order to deploy the infrastructure you just need to execute the bash script i
 $ sh deploy.sh
 ```
 
-This will kick off the process and deploy the /core resources by executing the `/core/deploy.sh` script. It will then move on to deploying the Cognito and Identity bits by executing the `/identity/deploy.sh` script.
+This will kick off the process and deploy the resources in each CloudFormation template.
 
 ### IMPORTANT
-During the initial deployment the `api-certificates.yaml` deployment will hang while CloudFormation waits for you to verify the DNS bound to the certificate.
+During the initial deployment the `api-certificates.yaml` deployment will hang while CloudFormation waits for you to verify the DNS bound to the certificate. If your Domain is managed by Route 53 (registered via Route 53, or purchased at another Registrar but Nameservers set to Route 53) then the verification can be done automatically. Otherwise, you must manually verify.
 
 You will need to add a CNAME to an existing Domain in order for the verification to happen. The CNAME records that need to be added can be seen in the Amazon Certificate Manager console. Once the CNAME is added for the Domain defined in the template along with the `SubjectAlternativeNames` then the CloudFormation template will continue to execute and complete.
+
+### Stack deployment order
+
+The following diagram shows the order in which the CloudFormation Stacks are deployed.
+
+![Resources](/docs/identity-infrastructure_deploy-process.jpeg)
 
 When this is completed you will have a full Identity stack deployed for use. CloudFormation Stacks must be deleted in the order they were deployed, newest to oldest. CloudFormation will show you the order in which they were deployed in the AWS Console.
 
@@ -61,68 +77,85 @@ When this is completed you will have a full Identity stack deployed for use. Clo
 
 This repository is responsible for creating the application clients and resource servers used by the APIs on the platform. As new APIs are on-boarded this repository needs to be updated to include new resource servers for the resources exposed by any newly deployed APIs.
 
-All deployments via CF and SAM that require uploading and storing in S3, regardless of repository, should use the deployment S3 bucket provisioned as part of the core infrastructure found in this repository.
+All deployments via CF and SAM that require uploading and storing in S3, regardless of repository, should use the deployment S3 bucket provisioned as part of the core infrastructure found in the [AWS Infrastructure](https://github.com/FocusMark/auth-infrastructure) Repository.
 
 # Usage
 
 ## Creating accounts and fetching Tokens
-You can now fetch tokens by creating a new user account and requesting a set of tokens.
+You can now fetch tokens by creating a new user account and requesting a set of tokens. This can be done from the web-browser by browsing to the https://{productName-targetEnvironment.auth.us-east-1.amazoncognito.com URL. Substitute the `productName` and `targetEnvironment` part of the URL with the values you provided as environment variables to the CloudFormation deployment scripts. For example, if productName was _supertodo_ and the environment was _test_ then your URL will be https://supertodo-test.auth.us-east-1.amazoncognito.com.
 
-To get started, go to the AWS Cognito Console and take note of the ClientId and ClientSecret created for the `Postman Client`. Create a new request in [Postman](https://getpostman.com) and select the `Authorization` tab. Set the type to `OAuth 2.0` and then select _Get New Access Token_
+In order to land on the login page you must provide a series of parameters in the URL query string. The following table defines what those parameters are. The parameters must be provided exactly as shown in the table as they are case-sensitive.
 
-![Authorization](/docs/postman-client-001.png)
+| parameter | expected value |
+|-----------|----------------|
+| client_id | Client Id for the client accessing the login page. For testing you can find the Postman Client Id in the Cognito UserPool console page in AWS |
+| client_secret | If a Client Secret is required by the Client chosen above then you must provide it. The Postman Client for instance requires a Secret. |
+| redirect_uri | This is defined by the Client being used. For example, Postman client requires a value of https://{targetEnvironment}-auth.{productName}.app
+| response_type | The literal value of `code` |
+| scopes | Supported Scopes are: `openid`, `app.supertodo.api.project/project.read`, `app.supertodo.api.project/project.write`, `app.supertodo.api.project/project.delete`, `app.supertodo.api.task/task.write`, `app.supertodo.api.task/task.write` and `app.supertodo.api.task/task.delete` |
 
-Enter the Auth URL as the Domain created when the UserPool deployment happened. By default the domain is:
+The scopes indicate what you want to do with the API. For example, if you don't include `app.supertodo.api.task/task.read` but you do include `app.supertodo.api.task/task.write` then you will be allowed to create new Tasks but you will not be allwoed to query for them.
 
-> https://focusmark-${deployed_environment}-identity.auth.us-east-1.amazoncognito.com/login
+An example URL with all of the above parameters added to the Query String, assuming a `productName` and `targetEnvironment` of _supertodo_ and _test_ - your URL would be:
 
-You will need to substitute the `${deployed_environment}` with the environment value you set in the environment variables prior to deploying.
+https://supertodo-test.auth.us-east-1.amazoncognito.com/login?client_id=123456789&client_secret=abcdefghijklmnopqrstuvwxyz&redirect_uri=https://test-auth.supertodo.app&response_type=code&scopes=openid+app.supertodo.api.project/project.read+app.supertodo.api.project/project.write+app.supertodo.api.project/project.delete+app.supertodo.api.task/task.delete
 
-Access Token URL will follow the same naming convention, with a different Route.
+![Login](/docs/login-ui.png)
 
-> https://focusmark-local-identity.auth.us-east-1.amazoncognito.com/oauth2/token
+You may select _Sign up_ at the bottom to create a new account. 
 
-Enter the Client Id and Client Secret found in the AWS Cognito Console for the Postman App. For Scopes, enter `openid`. For the Callback URL enter:
+![Sign Up](/docs/signup-ui.png)
 
-> https://${deployed_environment}.identity.focusmark.app
+When you create a new account an email confirmation will be sent to the email address provided.
 
-Your should look similar, with the Client Id and Client Secrets filled in.
+![Sign Up](/docs/signup-verification.png)
 
-![Authorization](/docs/postman-client-002.png)
+You can click the link in the email and it redirect you back to the auth page notifying you that your account has been confirmed. You can return to the login page and enter your credentials. Upon logging into your account you will be redirected to a page saying _This site can't be reached_. This is ok - if you look at the URL bar you will notice a new query string parameter has been given to you. The parameter is `code` and the value is a 1-time code you can use. This code can be exchanged for an `access token` that can be used to authorize your REST requests.
 
-This will navigate you to the Cognito custom domain and present the hosted UI for account sign-in. 
+You can take this code and make a CURL request to a new URL - https://{productName}-{targetEnvironment}.auth.us-east-1.amazoncognito.com/oauth2/token.
 
-![Authorization](/docs/postman-client-003.png)
+You will need to make the CURL request a POST with a body that is formatted as `x-www-form-urlencoded`. The body must contain the following parameters:
 
-Since you won't have an account initially, click the Sign Up link instead. Enter the information asked for and click Sign up
+| parameter | expected value |
+|-----------|----------------|
+| client_id | Client Id for the client accessing the login page. For testing you can find the Postman Client Id in the Cognito UserPool console page in AWS |
+| client_secret | If a Client Secret is required by the Client chosen above then you must provide it. The Postman Client for instance requires a Secret. |
+| redirect_uri | This is defined by the Client being used. For example, Postman client requires a value of https://{targetEnvironment}-auth.{productName}.app
+| code | The value of the `code` given after you logged in. |
+| grant_type | The literal value of `authorization_code` |
 
-![Authorization](/docs/postman-client-004.png)
+An example CURL request would look like this: 
 
-You will be prompted to go in to your email and click the confirmation link email that was sent to you. 
+```
+curl --location --request POST 'https://supertodo-test.auth.us-east-1.amazoncognito.com/oauth2/token' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'code=abcdefg-abcd-abcd-abcd-12345678' \
+--data-urlencode 'grant_type=authorization_code' \
+--data-urlencode 'client_id=123456789' \
+--data-urlencode 'client_secret=abcdefghijklmnop' \
+--data-urlencode 'redirect_uri=https://test-auth.supertodo.app'
+```
 
-![Authorization](/docs/postman-client-005.png)
+After you make this request you will receive the following JSON payload containing your Access key, Refresh Token and Id Token.
 
-If you entered a valid email address then you will see an email like the following in your mail box:
+```
+{
+    "id_token": "eyJraWQiOiJQ.....",
+    "access_token": "eyJraWQiOiJ......",
+    "refresh_token": "eyJjdHkiOiJK.....",
+    "expires_in": 3600,
+    "token_type": "Bearer"
+}
+```
 
-![Authorization](/docs/postman-client-009.png)
+## Postman
 
-Click the link to verify the account. If you did not enter a valid email address then you will have to manually confirm your account within Cognito. To do this, go into the Users and Groups section, and find your new user account:
+You can configure Postman to automate this process for you. This is done by setting the Authorization of a Postman request to OAuth 2.0 and using a **Header Prefix** of `Bearer`.
 
-![Authorization](/docs/postman-client-006.png)
+![Postman Request](/docs/login-postman-auth-ui.png)
 
-Select your user account and then select the Confirm User:
+You can then select the **Get New Access Token** button to launch the auth config. Enter the values into the fields that you would have manually provided via query strings as shown above.
 
-![Authorization](/docs/postman-client-007.png)
+![Postman Auth Config](/docs/login-postman-auth-config.png)
 
-Once you have confirmed your account go back to Postman and click the Continue button: 
-
-![Authorization](/docs/postman-client-005.png)
-
-This will complete the `authorization_code` flow that is used and produce a set of tokens.
-
-![Authorization](/docs/postman-client-008.png)
-
-You will receive the `access_token` and a `refresh_token`. Since we specified `openid` as a Scope you will also receive an `identity_token`. You can take the `acess_token` or the `identity_token` and paste them into [Jwt IO](https://jwt.io) to see what they look like.
-
-# Details
-> TODO: Discuss adding clients, authorizing APIs in a "hook" in pattern and why usernames over emails, why emails are not in access_tokens and linking data records back to a user via 'sub' and not username or email.
+You can then request a new token and use it on any of the FocusMark APIs.
