@@ -11,8 +11,9 @@ cd src
 # Deploy certificates
 certificates_template='auth-certificates.yaml'
 certificates_stackname=$product_name-"$deployed_environment"-cf-auth-certificates
-echo Deploying the $certificates_stackname stack into $deployed_environment
 
+echo Deploying the $certificates_stackname stack into $deployed_environment
+cfn-lint $certificates_template
 aws cloudformation deploy \
     --template-file $certificates_template \
     --stack-name $certificates_stackname \
@@ -26,6 +27,7 @@ stack_name_identity=$product_name-"$deployed_environment"-cf-auth-customeridenti
 template_file_identity='identity.yaml'
 
 echo Deploying the $stack_name_identity stack into $deployed_environment
+cfn-lint $template_file_identity
 aws cloudformation deploy \
     --template-file $template_file_identity \
     --stack-name $stack_name_identity \
@@ -38,6 +40,7 @@ stack_name_resource_servers=$product_name-"$deployed_environment"-cf-auth-resour
 template_file_resource_servers='resource-servers.yaml'
 
 echo Deploying the $stack_name_resource_servers stack into $deployed_environment
+cfn-lint $template_file_resource_servers
 aws cloudformation deploy \
     --template-file $template_file_resource_servers \
     --stack-name $stack_name_resource_servers \
@@ -50,6 +53,7 @@ stack_name_client_apps=$product_name-"$deployed_environment"-cf-auth-clientapps
 template_file_client_apps='client-apps.yaml'
 
 echo Deploying the $stack_name_client_apps stack into $deployed_environment
+cfn-lint $template_file_client_apps
 aws cloudformation deploy \
     --template-file $template_file_client_apps \
     --stack-name $stack_name_client_apps \

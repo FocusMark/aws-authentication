@@ -51,7 +51,7 @@ Resources:
         - !Sub 'app.${ProductName}.api.task/task.read'
         - !Sub 'app.${ProductName}.api.task/task.delete'
       CallbackURLs:
-        - !Sub "http://localhost:9000"
+        - "http://localhost:9000"
       ClientName: !Join [ "-", [ !Ref ProductName, !Ref TargetEnvironment, 'userpoolclient', 'windowscli' ]]
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
