@@ -63,11 +63,6 @@ $ sh deploy.sh
 
 This will kick off the process and deploy the resources in each CloudFormation template.
 
-### IMPORTANT
-During the initial deployment the `api-certificates.yaml` deployment will hang while CloudFormation waits for you to verify the DNS bound to the certificate. If your Domain is managed by Route 53 (registered via Route 53, or purchased at another Registrar but Nameservers set to Route 53) then the verification can be done automatically. Otherwise, you must manually verify.
-
-You will need to add a CNAME to an existing Domain in order for the verification to happen. The CNAME records that need to be added can be seen in the Amazon Certificate Manager console. Once the CNAME is added for the Domain defined in the template along with the `SubjectAlternativeNames` then the CloudFormation template will continue to execute and complete.
-
 ### Stack deployment order
 
 The following diagram shows the order in which the CloudFormation Stacks are deployed.
